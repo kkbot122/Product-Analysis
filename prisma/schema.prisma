@@ -63,6 +63,8 @@ model Event {
   properties    Json?
   occurredAt    DateTime    @default(now())
 
+  sessionId     String? 
+
   @@index([projectId, occurredAt])
   @@index([projectId, eventName])
   @@index([trackedUserId])

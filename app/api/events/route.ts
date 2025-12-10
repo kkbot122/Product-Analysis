@@ -21,10 +21,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!project) {
-      return NextResponse.json(
-        { error: "Invalid API key" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Invalid API key" }, { status: 401 });
     }
 
     // Create/update user and event in transaction
@@ -56,6 +53,7 @@ export async function POST(request: NextRequest) {
           eventName: event_name,
           properties: properties ?? {},
           occurredAt: timestamp ? new Date(timestamp) : new Date(),
+          sessionId: body.session_id,
         },
       });
     });
@@ -80,4 +78,56 @@ export async function OPTIONS() {
       "Access-Control-Allow-Headers": "Content-Type",
     },
   });
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const searchParams = request.nextUrl.searchParams;
+    const projectId = searchParams.get("project");
+
+    console.log("🔍 Fetching events for project:", projectId);
+
+    if (!projectId) {
+      console.log("⚠️ No project ID provided");
+      return NextResponse.json([], { status: 200 });
+    }
+
+    // First, check if the project exists
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+    });
+
+    if (!project) {
+      console.log("❌ Project not found:", projectId);
+      return NextResponse.json([], { status: 200 });
+    }
+
+    console.log("✅ Project found:", project.name);
+
+    // Get events
+    const events = await prisma.event.findMany({
+      where: {
+        projectId,
+      },
+      orderBy: { occurredAt: "desc" },
+      take: 50,
+      include: {
+        trackedUser: {
+          select: {
+            externalId: true,
+          },
+        },
+      },
+    });
+
+    console.log(`📊 Found ${events.length} events for project ${projectId}`);
+
+    return NextResponse.json(events);
+  } catch (error) {
+    console.error("❌ Failed to fetch events:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch events" },
+      { status: 500 }
+    );
+  }
 }
